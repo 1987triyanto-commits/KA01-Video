@@ -1,0 +1,9 @@
+{
+  "name": "Video Kelulusan SDN Karang Anyar 01 Pagi",
+  "description": "Aplikasi perekaman video kesan, pesan, dan motivasi kelulusan SDN Karang Anyar 01 Pagi dengan overlay template animasi yang disimpan di Google Drive.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
