@@ -35,6 +35,7 @@ export default function VideoRecorder({
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState<RecordedVideo | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   // Timer and countdowns
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -129,6 +130,31 @@ export default function VideoRecorder({
       if (ticker) clearInterval(ticker);
     };
   }, [isRecording]);
+
+  // Auto-trigger video playback when recording completes and is ready
+  useEffect(() => {
+    if (recordedVideo) {
+      setIsPlaying(true);
+      const toastEvent = new CustomEvent('toast', { 
+        detail: 'Video rekaman siap! Memutar otomatis...' 
+      });
+      window.dispatchEvent(toastEvent);
+
+      // Delayed playback check to ensure ref is bound
+      const playTimeout = setTimeout(() => {
+        if (playbackRef.current) {
+          playbackRef.current.play().catch(e => {
+            console.warn("Autoplay was prevented by browser policy:", e);
+            setIsPlaying(false);
+          });
+        }
+      }, 150);
+
+      return () => clearTimeout(playTimeout);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [recordedVideo]);
 
   // Draw overlay frames onto transparent canvas for live stream baking
   const initializeConfetti = () => {
@@ -617,17 +643,47 @@ export default function VideoRecorder({
               ref={playbackRef}
               src={recordedVideo.url}
               controls
+              autoPlay
               playsInline
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
               className="w-full h-full object-cover"
             />
+            {/* Central Play/Pause Overlay indicator */}
+            {!isPlaying && (
+              <button
+                onClick={() => {
+                  if (playbackRef.current) {
+                    playbackRef.current.play().catch(e => console.warn(e));
+                  }
+                }}
+                className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 hover:bg-black/30 transition-all cursor-pointer group"
+                id="preview_central_play_overlay"
+              >
+                <div className="w-16 h-16 rounded-full bg-indigo-600 border border-indigo-400 text-white flex items-center justify-center shadow-2xl transition duration-200 group-hover:scale-110">
+                  <Play className="w-8 h-8 fill-white translate-x-0.5 text-white" />
+                </div>
+                <span className="mt-3 text-[10px] md:text-xs font-bold text-white tracking-widest bg-slate-950/75 border border-white/10 px-3.5 py-1.5 rounded-xl uppercase font-mono shadow-lg">
+                  ▶️ Klik untuk Putar Rekaman
+                </span>
+              </button>
+            )}
+
+            {isPlaying && (
+              <div className="absolute top-16 left-4 z-30 bg-slate-950/85 border border-indigo-500/30 text-indigo-300 font-mono text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider animate-pulse pointer-events-none shadow-md">
+                🎬 Sedang Memutar Video
+              </div>
+            )}
+
             {/* Player Overlay Border mirroring the template design */}
-            <div className="absolute inset-0 pointer-events-none border-[5px]" style={{ borderColor: selectedTemplate.secondaryColor }}>
+            <div className="absolute inset-0 pointer-events-none border-[5px] z-25" style={{ borderColor: selectedTemplate.secondaryColor }}>
               <div className="absolute inset-1.5 border-2" style={{ borderColor: selectedTemplate.primaryColor }}></div>
               <div className="absolute top-4 right-4 bg-amber-500 border border-white text-blue-950 font-bold px-3 py-1 text-[9px] font-mono uppercase tracking-wide">
                 {selectedTemplate.badgeText}
               </div>
               <div className="w-full absolute bottom-4 left-0 px-4">
-                <div className="w-full text-center py-2 text-white font-bold text-xs md:text-sm rounded border-t-2" style={{ backgroundColor: selectedTemplate.primaryColor, borderColor: selectedTemplate.secondaryColor }}>
+                <div className="w-full text-center py-2 text-white font-bold text-xs md:text-sm rounded border-t-2 shadow-md" style={{ backgroundColor: selectedTemplate.primaryColor, borderColor: selectedTemplate.secondaryColor }}>
                   {selectedTemplate.bottomText}
                 </div>
               </div>
@@ -746,6 +802,21 @@ export default function VideoRecorder({
               {recordingMode === 'bake' 
                 ? ' "Bake Bingkai". Bingkai merah/emas dan tulisan nama akan dimasukkan permanen langsung di dalam file video! Cocok untuk Laptop/HP modern.' 
                 : ' "Mode Stabil". Sangat aman dan lancar untuk segala merek HP (termasuk iPhone/iPad). Desain kelulusan ditampilkan live di layar kamu saat rekam.'}
+            </div>
+          </div>
+        )}
+
+        {/* Playback Status Banner */}
+        {recordedVideo && (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-emerald-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs" id="playback_status_alert">
+            <span className="flex items-center gap-2 font-semibold">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+              Hasil Rekaman Siap Ditampilkan &amp; Diputar!
+            </span>
+            <div className="flex items-center gap-2 font-mono text-[10px] text-slate-300 bg-emerald-400/10 border border-emerald-400/20 px-2.5 py-1 rounded ml-4.5 sm:ml-0">
+              <span>Durasi: {formatTime(recordedVideo.duration)}</span>
+              <span className="text-emerald-500">•</span>
+              <span>Format: {recordedVideo.mimeType.split(';')[0]}</span>
             </div>
           </div>
         )}
